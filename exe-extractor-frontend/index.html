@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#6366f1">
+    <title>EXE 解压工具</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #6366f1;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px 16px; }
+        .header { text-align: center; padding: 30px 0; }
+        .header-icon {
+            width: 80px; height: 80px;
+            background: linear-gradient(135deg, var(--primary), #4f46e5);
+            border-radius: 20px;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 16px;
+            font-size: 40px;
+            box-shadow: 0 10px 40px rgba(99, 102, 241, 0.3);
+        }
+        .header h1 { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+        .header p { color: var(--text-muted); font-size: 14px; }
+        .badge {
+            display: inline-block;
+            background: #ecfdf5; color: #059669;
+            padding: 6px 12px; border-radius: 20px;
+            font-size: 12px; font-weight: 500; margin-top: 12px;
+        }
+        .upload-area {
+            background: var(--card);
+            border: 2px dashed var(--border);
+            border-radius: 16px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            margin-bottom: 20px;
+            transition: border-color 0.3s;
+        }
+        .upload-area:hover { border-color: var(--primary); }
+        .upload-area.disabled { pointer-events: none; opacity: 0.7; }
+        .upload-icon {
+            width: 60px; height: 60px;
+            background: var(--bg);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 16px;
+            font-size: 28px;
+        }
+        .upload-title { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+        .upload-hint { color: var(--text-muted); font-size: 13px; line-height: 1.5; }
+        #file-input { display: none; }
+        .progress { display: none; margin-bottom: 20px; }
+        .progress.show { display: block; }
+        .progress-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary), var(--success)); width: 0%; transition: width 0.3s; }
+        .progress-text { text-align: center; margin-top: 8px; color: var(--text-muted); font-size: 14px; }
+        .result { display: none; background: var(--card); border-radius: 16px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .result.show { display: block; }
+        .result-header { padding: 16px; background: linear-gradient(135deg, var(--success), #059669); color: white; }
+        .result-header h2 { font-size: 16px; font-weight: 600; }
+        .result-header p { font-size: 13px; opacity: 0.9; margin-top: 4px; }
+        .file-list { max-height: 400px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .file-item {
+            display: flex; align-items: center;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+        }
+        .file-item:active { background: var(--bg); }
+        .file-item:last-child { border-bottom: none; }
+        .file-icon { width: 40px; height: 40px; background: var(--bg); border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-right: 12px; font-size: 20px; }
+        .file-info { flex: 1; min-width: 0; }
+        .file-name { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .file-size { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+        .arrow { color: var(--primary); font-size: 20px; }
+        .download-all {
+            display: block;
+            width: calc(100% - 32px);
+            margin: 16px;
+            padding: 14px;
+            background: linear-gradient(135deg, var(--primary), #4f46e5);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .download-all:active { transform: scale(0.98); }
+        .download-all:disabled { opacity: 0.5; cursor: not-allowed; }
+        .error-box { display: none; background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 16px; margin-bottom: 20px; }
+        .error-box.show { display: block; }
+        .error-title { color: var(--danger); font-weight: 600; margin-bottom: 8px; }
+        .error-msg { color: #991b1b; font-size: 14px; white-space: pre-wrap; line-height: 1.5; }
+        .info-box { margin-top: 30px; padding: 16px; background: var(--card); border-radius: 12px; }
+        .info-box h3 { font-size: 14px; color: var(--text-muted); margin-bottom: 12px; }
+        .tags { display: flex; flex-wrap: wrap; gap: 8px; }
+        .tag { padding: 6px 12px; background: var(--bg); border-radius: 6px; font-size: 13px; }
+        .tag.highlight { background: #ecfdf5; color: #059669; }
+        .footer { text-align: center; margin-top: 30px; color: var(--text-muted); font-size: 12px; }
+        /* 密码弹窗 */
+        .modal-bg { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; padding: 20px; }
+        .modal-bg.show { display: flex; }
+        .modal { background: var(--card); border-radius: 16px; width: 100%; max-width: 340px; overflow: hidden; }
+        .modal-header { padding: 24px 24px 0; text-align: center; }
+        .modal-icon { font-size: 48px; margin-bottom: 12px; }
+        .modal-title { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+        .modal-desc { font-size: 14px; color: var(--text-muted); }
+        .modal-body { padding: 20px 24px; }
+        .modal input { width: 100%; padding: 14px 16px; border: 2px solid var(--border); border-radius: 10px; font-size: 16px; outline: none; }
+        .modal input:focus { border-color: var(--primary); }
+        .modal-error { color: var(--danger); font-size: 13px; margin-top: 8px; display: none; }
+        .modal-error.show { display: block; }
+        .modal-btns { display: flex; gap: 12px; padding: 0 24px 24px; }
+        .modal-btn { flex: 1; padding: 14px; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; border: none; }
+        .modal-btn.cancel { background: var(--bg); color: var(--text); }
+        .modal-btn.ok { background: linear-gradient(135deg, var(--primary), #4f46e5); color: white; }
+        /* 详细信息 */
+        .detail-box { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 12px; padding: 16px; margin-bottom: 20px; font-size: 12px; }
+        .detail-title { font-weight: 600; color: #0369a1; margin-bottom: 8px; }
+        .detail-content { color: #0c4a6e; white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-icon">📦</div>
+            <h1>EXE 解压工具</h1>
+            <p>在浏览器本地解压自解压 EXE 文件</p>
+            <span class="badge">🔒 本地处理，隐私安全</span>
+        </div>
+        
+        <div class="upload-area" id="dropZone">
+            <div class="upload-icon">📁</div>
+            <div class="upload-title">点击选择文件</div>
+            <div class="upload-hint">支持 ZIP 自解压 EXE、标准 ZIP<br>支持传统加密</div>
+            <input type="file" id="fileInput" accept=".exe,.zip">
+        </div>
+        
+        <div class="detail-box" id="detailBox" style="display:none;">
+            <div class="detail-title">📋 详细信息</div>
+            <div class="detail-content" id="detailContent"></div>
+        </div>
+        
+        <div class="progress" id="progress">
+            <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+            <div class="progress-text" id="progressText">读取中...</div>
+        </div>
+        
+        <div class="error-box" id="errorBox">
+            <div class="error-title" id="errorTitle">❌ 解压失败</div>
+            <div class="error-msg" id="errorMsg"></div>
+        </div>
+        
+        <div class="result" id="result">
+            <div class="result-header">
+                <h2>✅ 解压成功</h2>
+                <p id="resultInfo"></p>
+            </div>
+            <div class="file-list" id="fileList"></div>
+            <button class="download-all" id="downloadAll">📥 打包下载全部</button>
+        </div>
+        
+        <div class="info-box">
+            <h3>支持的格式</h3>
+            <div class="tags">
+                <span class="tag highlight">ZIP 自解压</span>
+                <span class="tag highlight">传统加密 ZIP</span>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>纯前端实现 · 无需服务器</p>
+        </div>
+    </div>
+    
+    <!-- 密码弹窗 -->
+    <div class="modal-bg" id="pwdModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-icon">🔐</div>
+                <div class="modal-title">需要密码</div>
+                <div class="modal-desc">该压缩包已加密，请输入密码</div>
+            </div>
+            <div class="modal-body">
+                <input type="password" id="pwdInput" placeholder="请输入密码" autocomplete="off">
+                <div class="modal-error" id="pwdError">密码错误，请重试</div>
+            </div>
+            <div class="modal-btns">
+                <button class="modal-btn cancel" id="pwdCancel">取消</button>
+                <button class="modal-btn ok" id="pwdOk">确认</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script>
+    (function() {
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const progress = document.getElementById('progress');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const errorBox = document.getElementById('errorBox');
+        const errorTitle = document.getElementById('errorTitle');
+        const errorMsg = document.getElementById('errorMsg');
+        const result = document.getElementById('result');
+        const resultInfo = document.getElementById('resultInfo');
+        const fileList = document.getElementById('fileList');
+        const downloadAll = document.getElementById('downloadAll');
+        const detailBox = document.getElementById('detailBox');
+        const detailContent = document.getElementById('detailContent');
+        const pwdModal = document.getElementById('pwdModal');
+        const pwdInput = document.getElementById('pwdInput');
+        const pwdError = document.getElementById('pwdError');
+        const pwdCancel = document.getElementById('pwdCancel');
+        const pwdOk = document.getElementById('pwdOk');
+        
+        let files = [];
+        let pwdResolve = null;
+        let logLines = [];
+        
+        function log(msg) {
+            console.log(msg);
+            logLines.push(msg);
+        }
+        
+        function showLog() {
+            detailContent.textContent = logLines.join('\n');
+            detailBox.style.display = 'block';
+        }
+        
+        function formatSize(b) {
+            if (b < 1024) return b + ' B';
+            if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+            return (b/1024/1024).toFixed(1) + ' MB';
+        }
+        
+        function setProgress(pct, txt) {
+            progressFill.style.width = pct + '%';
+            progressText.textContent = txt;
+        }
+        
+        function showError(title, msg) {
+            errorTitle.textContent = title;
+            errorMsg.textContent = msg;
+            errorBox.classList.add('show');
+            progress.classList.remove('show');
+            dropZone.classList.remove('disabled');
+            showLog();
+        }
+        
+        function hideAll() {
+            errorBox.classList.remove('show');
+            result.classList.remove('show');
+            progress.classList.remove('show');
+            logLines = [];
+        }
+        
+        // 验证 ZIP 本地文件头是否有效
+        function isValidZipHeader(data, offset) {
+            if (offset + 30 > data.length) return false;
+            
+            const view = new DataView(data.buffer, data.byteOffset);
+            
+            // 检查签名
+            const sig = data[offset] | (data[offset+1] << 8) | (data[offset+2] << 16) | (data[offset+3] << 24);
+            if (sig !== 0x04034b50) return false;
+            
+            // 获取各字段
+            const version = view.getUint16(offset + 4, true);
+            const flags = view.getUint16(offset + 6, true);
+            const compressMethod = view.getUint16(offset + 8, true);
+            const compressedSize = view.getUint32(offset + 18, true);
+            const uncompressedSize = view.getUint32(offset + 22, true);
+            const nameLen = view.getUint16(offset + 26, true);
+            const extraLen = view.getUint16(offset + 28, true);
+            
+            // 验证合理性
+            // 1. 版本号应该在合理范围内 (1-100)
+            if (version < 1 || version > 100) return false;
+            
+            // 2. 压缩方法应该已知 (0, 1-8, 9, 12, 14, 97, 98, 99)
+            const knownMethods = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 14, 97, 98, 99];
+            if (!knownMethods.includes(compressMethod)) return false;
+            
+            // 3. 文件名长度应该合理 (< 1000)
+            if (nameLen > 1000) return false;
+            
+            // 4. 压缩大小不应该超过文件剩余大小太多
+            if (compressedSize > data.length - offset) return false;
+            
+            // 5. 尝试读取文件名，应该是可打印字符
+            const nameStart = offset + 30;
+            const nameEnd = nameStart + nameLen;
+            if (nameEnd > data.length) return false;
+            
+            let validName = true;
+            for (let i = nameStart; i < nameEnd; i++) {
+                const c = data[i];
+                // 允许: 字母、数字、常见符号、路径分隔符
+                if (c < 32 && c !== 0) {
+                    validName = false;
+                    break;
+                }
+            }
+            if (!validName) return false;
+            
+            return true;
+        }
+        
+        // 查找所有有效的 ZIP 起始位置
+        function findAllValidZipStarts(data) {
+            const positions = [];
+            const limit = Math.min(data.length - 4, 200 * 1024 * 1024); // 搜索前200MB
+            
+            for (let i = 0; i < limit; i++) {
+                // 快速检查 PK 签名
+                if (data[i] === 0x50 && data[i+1] === 0x4B && data[i+2] === 0x03 && data[i+3] === 0x04) {
+                    log('发现 PK\\x03\\x04 在位置 ' + i);
+                    
+                    if (isValidZipHeader(data, i)) {
+                        log('  ✓ 位置 ' + i + ' 是有效的 ZIP 文件头');
+                        positions.push(i);
+                    } else {
+                        log('  ✗ 位置 ' + i + ' 不是有效的 ZIP 文件头');
+                    }
+                }
+            }
+            
+            return positions;
+        }
+        
+        // 密码弹窗
+        function askPassword(isRetry = false) {
+            return new Promise(resolve => {
+                pwdResolve = resolve;
+                pwdInput.value = '';
+                pwdError.classList.toggle('show', isRetry);
+                pwdModal.classList.add('show');
+                setTimeout(() => pwdInput.focus(), 100);
+            });
+        }
+        
+        function closePwdModal(value) {
+            pwdModal.classList.remove('show');
+            if (pwdResolve) {
+                pwdResolve(value);
+                pwdResolve = null;
+            }
+        }
+        
+        pwdOk.onclick = () => closePwdModal(pwdInput.value);
+        pwdCancel.onclick = () => closePwdModal(null);
+        pwdInput.onkeypress = (e) => { if (e.key === 'Enter') pwdOk.click(); };
+        
+        dropZone.onclick = () => fileInput.click();
+        dropZone.ondragover = (e) => { e.preventDefault(); dropZone.style.borderColor = 'var(--primary)'; };
+        dropZone.ondragleave = () => { dropZone.style.borderColor = ''; };
+        dropZone.ondrop = (e) => {
+            e.preventDefault();
+            dropZone.style.borderColor = '';
+            if (e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]);
+        };
+        fileInput.onchange = () => { if (fileInput.files[0]) processFile(fileInput.files[0]); };
+        
+        async function processFile(file) {
+            hideAll();
+            detailBox.style.display = 'none';
+            progress.classList.add('show');
+            dropZone.classList.add('disabled');
+            files = [];
+            
+            try {
+                log('文件名: ' + file.name);
+                log('文件大小: ' + formatSize(file.size));
+                
+                setProgress(10, '读取文件...');
+                const buffer = await file.arrayBuffer();
+                const data = new Uint8Array(buffer);
+                log('读取完成: ' + data.length + ' 字节');
+                
+                setProgress(20, '搜索 ZIP 数据...');
+                const validPositions = findAllValidZipStarts(data);
+                
+                if (validPositions.length === 0) {
+                    log('未找到有效的 ZIP 文件头');
+                    showError('❌ 格式不支持', '未找到有效的 ZIP 数据\n\n可能原因：\n1. 不是 ZIP 格式的自解压文件\n2. 使用了不支持的压缩/加密方式\n3. 文件损坏');
+                    return;
+                }
+                
+                log('\n找到 ' + validPositions.length + ' 个有效 ZIP 起始位置');
+                
+                // 尝试每个有效位置
+                for (let i = 0; i < validPositions.length; i++) {
+                    const pos = validPositions[i];
+                    log('\n=== 尝试位置 ' + pos + ' (' + (i+1) + '/' + validPositions.length + ') ===');
+                    
+                    const zipData = data.slice(pos);
+                    
+                    // 检测加密
+                    const flags = new DataView(zipData.buffer, zipData.byteOffset).getUint16(6, true);
+                    const encrypted = (flags & 0x1) === 1;
+                    log('加密: ' + (encrypted ? '是' : '否'));
+                    
+                    let password = null;
+                    if (encrypted) {
+                        password = await askPassword(false);
+                        if (!password) {
+                            progress.classList.remove('show');
+                            dropZone.classList.remove('disabled');
+                            return;
+                        }
+                        log('用户输入密码: ' + password.length + ' 字符');
+                    }
+                    
+                    const success = await tryExtract(zipData, password);
+                    if (success) {
+                        return; // 成功，退出
+                    }
+                }
+                
+                showError('❌ 解压失败', '尝试了所有可能的 ZIP 位置都无法解压\n\n可能原因：\n1. 密码错误\n2. 使用了不支持的压缩方法\n3. 文件损坏');
+                
+            } catch (err) {
+                log('错误: ' + err.message);
+                showError('❌ 解压失败', err.message || '未知错误');
+            } finally {
+                dropZone.classList.remove('disabled');
+                if (!pwdModal.classList.contains('show')) {
+                    progress.classList.remove('show');
+                }
+            }
+        }
+        
+        async function tryExtract(zipData, password) {
+            setProgress(40, '解压中...');
+            
+            // 尝试 fflate
+            log('尝试 fflate...');
+            const fflateResult = extractWithFflate(zipData, password);
+            log('fflate: success=' + fflateResult.success + ', files=' + fflateResult.files.length);
+            
+            if (fflateResult.success && fflateResult.files.length > 0 && fflateResult.files[0].size > 0) {
+                files = fflateResult.files;
+                logFiles();
+                showResult();
+                return true;
+            }
+            
+            // 尝试 JSZip
+            log('尝试 JSZip...');
+            const jszipResult = await extractWithJSZip(zipData, password);
+            log('JSZip: success=' + jszipResult.success + ', files=' + jszipResult.files.length);
+            
+            if (jszipResult.success && jszipResult.files.length > 0 && jszipResult.files[0].size > 0) {
+                files = jszipResult.files;
+                logFiles();
+                showResult();
+                return true;
+            }
+            
+            // 需要密码重试
+            if (fflateResult.needPassword || jszipResult.needPassword) {
+                const newPwd = await askPassword(password !== null);
+                if (newPwd) {
+                    return await tryExtract(zipData, newPwd);
+                }
+            }
+            
+            return false;
+        }
+        
+        function logFiles() {
+            log('=== 解压出的文件 ===');
+            files.forEach((f, i) => {
+                log((i+1) + '. ' + f.name + ' (' + formatSize(f.size) + ')');
+            });
+        }
+        
+        function extractWithFflate(zipData, password) {
+            try {
+                const opts = password ? { password } : {};
+                const unzipped = fflate.unzipSync(zipData, opts);
+                
+                const files = [];
+                for (const [path, data] of Object.entries(unzipped)) {
+                    if (!path.endsWith('/') && data.length > 0) {
+                        files.push({ name: path.split('/').pop() || path, path, size: data.length, data });
+                    }
+                }
+                
+                return { success: true, files };
+            } catch (e) {
+                const msg = (e.message || '').toLowerCase();
+                const needPassword = msg.includes('password') || msg.includes('decrypt') || msg.includes('encrypted');
+                return { success: false, error: e.message, needPassword, files: [] };
+            }
+        }
+        
+        async function extractWithJSZip(zipData, password) {
+            try {
+                const opts = password ? { password } : {};
+                const zip = await JSZip.loadAsync(zipData, opts);
+                
+                const files = [];
+                for (const [name, entry] of Object.entries(zip.files)) {
+                    if (entry.dir) continue;
+                    try {
+                        const data = await entry.async('uint8array');
+                        if (data.length > 0) {
+                            files.push({ name: name.split('/').pop() || name, path: name, size: data.length, data });
+                        }
+                    } catch (e) {
+                        const msg = (e.message || '').toLowerCase();
+                        if (msg.includes('password') || msg.includes('encrypt')) {
+                            return { success: false, needPassword: true, files: [] };
+                        }
+                    }
+                }
+                
+                return { success: true, files };
+            } catch (e) {
+                const msg = (e.message || '').toLowerCase();
+                return { success: false, error: e.message, needPassword: msg.includes('password'), files: [] };
+            }
+        }
+        
+        function showResult() {
+            const total = files.reduce((s, f) => s + f.size, 0);
+            resultInfo.textContent = `${files.length} 个文件，共 ${formatSize(total)}`;
+            
+            fileList.innerHTML = files.map((f, i) => `
+                <div class="file-item" data-idx="${i}">
+                    <div class="file-icon">📄</div>
+                    <div class="file-info">
+                        <div class="file-name">${f.name}</div>
+                        <div class="file-size">${formatSize(f.size)}</div>
+                    </div>
+                    <span class="arrow">›</span>
+                </div>
+            `).join('');
+            
+            fileList.querySelectorAll('.file-item').forEach(item => {
+                item.onclick = () => downloadFile(files[+item.dataset.idx]);
+            });
+            
+            progress.classList.remove('show');
+            showLog();
+            result.classList.add('show');
+        }
+        
+        function downloadFile(f) {
+            const blob = new Blob([f.data]);
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = f.name;
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }
+        
+        downloadAll.onclick = async () => {
+            downloadAll.disabled = true;
+            downloadAll.textContent = '⏳ 打包中...';
+            try {
+                const zip = new JSZip();
+                files.forEach(f => zip.file(f.path, f.data));
+                const blob = await zip.generateAsync({ type: 'blob' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'extracted.zip';
+                a.click();
+                URL.revokeObjectURL(a.href);
+            } catch (e) {
+                alert('打包失败');
+            }
+            downloadAll.disabled = false;
+            downloadAll.textContent = '📥 打包下载全部';
+        };
+    })();
+    </script>
+</body>
+</html>

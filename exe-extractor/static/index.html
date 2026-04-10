@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#6366f1">
+    <title>EXE 解压服务</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --primary: #6366f1;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px 16px; padding-bottom: env(safe-area-inset-bottom); }
+        .header { text-align: center; padding: 30px 0; }
+        .header-icon {
+            width: 80px; height: 80px;
+            background: linear-gradient(135deg, var(--primary), #4f46e5);
+            border-radius: 20px;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 16px;
+            font-size: 40px;
+            box-shadow: 0 10px 40px rgba(99, 102, 241, 0.3);
+        }
+        .header h1 { font-size: 24px; font-weight: 700; margin-bottom: 8px; }
+        .header p { color: var(--text-muted); font-size: 14px; }
+        .badge { display: inline-block; background: #ecfdf5; color: #059669; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; margin-top: 12px; }
+        
+        .upload-area {
+            background: var(--card);
+            border: 2px dashed var(--border);
+            border-radius: 16px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        .upload-area:hover { border-color: var(--primary); }
+        .upload-area.disabled { pointer-events: none; opacity: 0.7; }
+        .upload-icon { width: 60px; height: 60px; background: var(--bg); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 28px; }
+        .upload-title { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+        .upload-hint { color: var(--text-muted); font-size: 13px; line-height: 1.5; }
+        #file-input { display: none; }
+        
+        .progress { display: none; margin-bottom: 20px; }
+        .progress.show { display: block; }
+        .progress-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary), var(--success)); width: 0%; transition: width 0.3s; }
+        .progress-text { text-align: center; margin-top: 8px; color: var(--text-muted); font-size: 14px; }
+        
+        .result { display: none; background: var(--card); border-radius: 16px; overflow: hidden; }
+        .result.show { display: block; }
+        .result-header { padding: 16px; background: linear-gradient(135deg, var(--success), #059669); color: white; }
+        .result-header h2 { font-size: 16px; font-weight: 600; }
+        .result-header p { font-size: 13px; opacity: 0.9; margin-top: 4px; }
+        
+        .file-list { max-height: 400px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .file-item { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); cursor: pointer; }
+        .file-item:active { background: var(--bg); }
+        .file-icon { width: 40px; height: 40px; background: var(--bg); border-radius: 10px; display: flex; align-items: center; justify-content: center; margin-right: 12px; font-size: 20px; }
+        .file-info { flex: 1; min-width: 0; }
+        .file-name { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .file-size { font-size: 12px; color: var(--text-muted); }
+        .arrow { color: var(--primary); font-size: 20px; }
+        
+        .download-all { display: block; width: calc(100% - 32px); margin: 16px; padding: 14px; background: linear-gradient(135deg, var(--primary), #4f46e5); color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; }
+        .download-all:disabled { opacity: 0.5; }
+        
+        .error-box { display: none; background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 16px; margin-bottom: 20px; }
+        .error-box.show { display: block; }
+        .error-title { color: var(--danger); font-weight: 600; margin-bottom: 4px; }
+        .error-msg { color: #991b1b; font-size: 14px; white-space: pre-wrap; }
+        
+        .info-box { margin-top: 30px; padding: 16px; background: var(--card); border-radius: 12px; }
+        .info-box h3 { font-size: 14px; color: var(--text-muted); margin-bottom: 12px; }
+        .tags { display: flex; flex-wrap: wrap; gap: 8px; }
+        .tag { padding: 6px 12px; background: var(--bg); border-radius: 6px; font-size: 13px; }
+        .tag.highlight { background: #ecfdf5; color: #059669; }
+        .tag.aes { background: #fef3c7; color: #92400e; }
+        
+        .footer { text-align: center; margin-top: 30px; color: var(--text-muted); font-size: 12px; }
+        
+        /* 密码弹窗 */
+        .modal-bg { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; padding: 20px; }
+        .modal-bg.show { display: flex; }
+        .modal { background: var(--card); border-radius: 16px; width: 100%; max-width: 340px; overflow: hidden; }
+        .modal-header { padding: 24px 24px 0; text-align: center; }
+        .modal-icon { font-size: 48px; margin-bottom: 12px; }
+        .modal-title { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+        .modal-desc { font-size: 14px; color: var(--text-muted); }
+        .modal-body { padding: 20px 24px; }
+        .modal input { width: 100%; padding: 14px 16px; border: 2px solid var(--border); border-radius: 10px; font-size: 16px; outline: none; }
+        .modal input:focus { border-color: var(--primary); }
+        .modal-error { color: var(--danger); font-size: 13px; margin-top: 8px; display: none; }
+        .modal-error.show { display: block; }
+        .modal-btns { display: flex; gap: 12px; padding: 0 24px 24px; }
+        .modal-btn { flex: 1; padding: 14px; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; border: none; }
+        .modal-btn.cancel { background: var(--bg); color: var(--text); }
+        .modal-btn.ok { background: linear-gradient(135deg, var(--primary), #4f46e5); color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-icon">📦</div>
+            <h1>EXE 解压服务</h1>
+            <p>支持 AES-256 加密的 ZIP 文件</p>
+            <span class="badge">✨ 支持所有加密方式</span>
+        </div>
+        
+        <div class="upload-area" id="dropZone">
+            <div class="upload-icon">📁</div>
+            <div class="upload-title">点击选择文件</div>
+            <div class="upload-hint">支持所有格式的自解压 EXE<br>包括 AES-256 加密，最大 500MB</div>
+            <input type="file" id="fileInput" accept=".exe,.zip,.7z,.rar">
+        </div>
+        
+        <div class="progress" id="progress">
+            <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+            <div class="progress-text" id="progressText">上传中...</div>
+        </div>
+        
+        <div class="error-box" id="errorBox">
+            <div class="error-title">❌ 解压失败</div>
+            <div class="error-msg" id="errorMsg"></div>
+        </div>
+        
+        <div class="result" id="result">
+            <div class="result-header">
+                <h2>✅ 解压成功</h2>
+                <p id="resultInfo"></p>
+            </div>
+            <div class="file-list" id="fileList"></div>
+            <button class="download-all" id="downloadAll">📥 打包下载全部</button>
+        </div>
+        
+        <div class="info-box">
+            <h3>支持的格式</h3>
+            <div class="tags">
+                <span class="tag highlight">ZIP 自解压</span>
+                <span class="tag highlight">7z 自解压</span>
+                <span class="tag aes">AES-256 加密 ✅</span>
+                <span class="tag">RAR 自解压</span>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>服务端处理 · 支持所有加密方式</p>
+        </div>
+    </div>
+    
+    <div class="modal-bg" id="pwdModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-icon">🔐</div>
+                <div class="modal-title">需要密码</div>
+                <div class="modal-desc" id="pwdDesc">该压缩包已加密，请输入密码</div>
+            </div>
+            <div class="modal-body">
+                <input type="password" id="pwdInput" placeholder="请输入密码" autocomplete="off">
+                <div class="modal-error" id="pwdError">密码错误，请重试</div>
+            </div>
+            <div class="modal-btns">
+                <button class="modal-btn cancel" id="pwdCancel">取消</button>
+                <button class="modal-btn ok" id="pwdOk">确认解压</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    (function() {
+        const $ = id => document.getElementById(id);
+        let sessionId = null;
+        let pendingSessionId = null;
+        let pendingFilename = null;
+        
+        $('dropZone').onclick = () => $('fileInput').click();
+        $('dropZone').ondragover = e => { e.preventDefault(); $('dropZone').style.borderColor = 'var(--primary)'; };
+        $('dropZone').ondragleave = () => { $('dropZone').style.borderColor = ''; };
+        $('dropZone').ondrop = e => { e.preventDefault(); $('dropZone').style.borderColor = ''; e.dataTransfer.files[0] && uploadFile(e.dataTransfer.files[0]); };
+        $('fileInput').onchange = () => { $('fileInput').files[0] && uploadFile($('fileInput').files[0]); };
+        
+        // 密码弹窗
+        function showPasswordModal(isRetry = false, message = '该压缩包已加密，请输入密码') {
+            $('pwdInput').value = '';
+            $('pwdError').classList.toggle('show', isRetry);
+            $('pwdDesc').textContent = message;
+            $('pwdModal').classList.add('show');
+            setTimeout(() => $('pwdInput').focus(), 100);
+            
+            return new Promise(resolve => {
+                window.pwdResolve = resolve;
+            });
+        }
+        
+        $('pwdOk').onclick = async () => {
+            const pwd = $('pwdInput').value;
+            if (!pwd) return;
+            
+            $('pwdModal').classList.remove('show');
+            
+            // 直接发送密码，不需要重新上传文件
+            $('progress').classList.add('show');
+            $('progressFill').style.width = '90%';
+            $('progressText').textContent = '解压中...';
+            
+            try {
+                const formData = new FormData();
+                formData.append('sessionId', pendingSessionId);
+                formData.append('password', pwd);
+                
+                const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                const data = await res.json();
+                
+                if (data.needPassword) {
+                    $('progress').classList.remove('show');
+                    const retry = await showPasswordModal(true, data.message);
+                    if (retry) {
+                        // 用户点击取消
+                        $('dropZone').classList.remove('disabled');
+                    }
+                    return;
+                }
+                
+                if (!data.success) {
+                    throw new Error(data.error || data.message || '解压失败');
+                }
+                
+                showResult(data);
+                
+            } catch (e) {
+                $('errorMsg').textContent = e.message;
+                $('errorBox').classList.add('show');
+                $('progress').classList.remove('show');
+                $('dropZone').classList.remove('disabled');
+            }
+        };
+        
+        $('pwdCancel').onclick = () => {
+            $('pwdModal').classList.remove('show');
+            $('dropZone').classList.remove('disabled');
+            $('progress').classList.remove('show');
+        };
+        
+        $('pwdInput').onkeypress = e => { if (e.key === 'Enter') $('pwdOk').click(); };
+        
+        async function uploadFile(file) {
+            $('errorBox').classList.remove('show');
+            $('result').classList.remove('show');
+            $('progress').classList.add('show');
+            $('dropZone').classList.add('disabled');
+            $('progressFill').style.width = '10%';
+            $('progressText').textContent = '上传中...';
+            
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                const xhr = new XMLHttpRequest();
+                
+                xhr.upload.onprogress = e => {
+                    if (e.lengthComputable) {
+                        const pct = Math.round(e.loaded / e.total * 80);
+                        $('progressFill').style.width = pct + '%';
+                        $('progressText').textContent = `上传 ${Math.round(e.loaded/1024/1024)}/${Math.round(e.total/1024/1024)} MB`;
+                    }
+                };
+                
+                const data = await new Promise((resolve, reject) => {
+                    xhr.open('POST', '/api/upload');
+                    xhr.onload = () => {
+                        if (xhr.status === 200) {
+                            resolve(JSON.parse(xhr.responseText));
+                        } else {
+                            reject(new Error('服务器错误: ' + xhr.status));
+                        }
+                    };
+                    xhr.onerror = () => reject(new Error('网络错误'));
+                    xhr.send(formData);
+                });
+                
+                // 检测到需要密码
+                if (data.needPassword) {
+                    pendingSessionId = data.sessionId;
+                    pendingFilename = file.name;
+                    $('progressFill').style.width = '100%';
+                    $('progressText').textContent = '检测到加密文件';
+                    
+                    // 稍后显示密码框
+                    setTimeout(async () => {
+                        $('progress').classList.remove('show');
+                        await showPasswordModal(false, data.message);
+                    }, 300);
+                    return;
+                }
+                
+                if (!data.success) {
+                    throw new Error(data.error || data.message || '解压失败');
+                }
+                
+                showResult(data);
+                
+            } catch (e) {
+                $('errorMsg').textContent = e.message;
+                $('errorBox').classList.add('show');
+                $('progress').classList.remove('show');
+            } finally {
+                $('dropZone').classList.remove('disabled');
+            }
+        }
+        
+        function showResult(data) {
+            sessionId = data.sessionId;
+            
+            $('resultInfo').textContent = `${data.totalFiles} 个文件，共 ${data.totalSize}`;
+            $('fileList').innerHTML = data.files.map(f => `
+                <div class="file-item" onclick="download('${f.path}')">
+                    <div class="file-icon">📄</div>
+                    <div class="file-info">
+                        <div class="file-name">${f.name}</div>
+                        <div class="file-size">${f.sizeFormatted}</div>
+                    </div>
+                    <span class="arrow">›</span>
+                </div>
+            `).join('');
+            
+            $('progress').classList.remove('show');
+            $('result').classList.add('show');
+            $('dropZone').classList.remove('disabled');
+        }
+        
+        window.download = function(path) {
+            window.location.href = `/api/download/${sessionId}/${encodeURIComponent(path)}`;
+        };
+        
+        $('downloadAll').onclick = () => {
+            window.location.href = `/api/download-all/${sessionId}`;
+        };
+    })();
+    </script>
+</body>
+</html>
